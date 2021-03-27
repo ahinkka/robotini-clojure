@@ -27,12 +27,20 @@
     (println "* send" data-as-json)
     (.println output-socket data-as-json)))
 
-(defn get-image-bytes
+(defn read-image-bytes
   [input-socket]
   (let [image-length (.readUnsignedShort input-socket)
         image-bytes (byte-array image-length)]
     ;; (println "* reading image" image-length "bytes")
-    (.read input-socket image-bytes 0 image-length)
+    (loop [bytes-read-so-far 0]
+      (when (< bytes-read-so-far (- image-length 1))
+        (recur
+         (+ bytes-read-so-far
+            (.read
+             input-socket
+             image-bytes
+             bytes-read-so-far
+             (- image-length bytes-read-so-far))))))
     image-bytes))
 
 (defn make-label
@@ -98,7 +106,7 @@
         label (when graphics? (make-label))]
     (send-json-data out {"teamId" team-id "name" team-name})
     (while true
-      (let [buffered-image (-> in get-image-bytes bytes->image)
+      (let [buffered-image (-> in read-image-bytes bytes->image)
             pixels (-> buffered-image image->bgr-triples)
             actions (get-actions pixels)]
         (when label (show-image label buffered-image))
