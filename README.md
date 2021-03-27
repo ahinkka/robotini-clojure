@@ -1,6 +1,6 @@
 # robotini-clojure
 
-A basic Clojure bot template for Robotini Racing. It runs, but not very well.
+A basic Clojure bot template for Robotini Racing. It runs, but it's not very fast.
 
 Run with `lein run` or via REPL of your choice.
 
