@@ -15,7 +15,8 @@
 (defn connect
   [ip port]
   (println "Connecting to simulator" ip port)
-  (let [simulator-socket (Socket. ip port)
+  (let [simulator-socket (doto (Socket. ip port)
+                           (.setTcpNoDelay true))
         in (-> simulator-socket (.getInputStream) (DataInputStream.))
         out (-> simulator-socket (.getOutputStream) (PrintWriter. true))]
     (println "Connected!")
