@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Car</title>
+    <style>
+      body {
+        background: #000000;
+        color: #ffffff;
+        font-size: 20px;
+        margin: 20px;
+      }
+      .images {
+        margin: 20px 0;
+      }
+      button {
+        background: #525252;
+        border: none;
+        border-radius: 10px;
+        padding: 10px 20px;
+        margin: 10px;
+        font-size: 26px;
+        color: #ffffff;
+        min-width: 200px;
+        text-transform: uppercase;
+        cursor: pointer;
+        user-select: none;
+      }
+      button:focus {
+        outline: none;
+      }
+      img {
+        margin-right: 20px;
+        image-rendering: crisp-edges;
+        width: 400px;
+      }
+      pre {
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="images">
+      <img id="original" />
+      <img id="processed" />
+    </div>
+    <button id="move">Move</button>
+    <pre id="metadata"></pre>
+  </body>
+  <script>
+    const originalImage = document.getElementById("original");
+    const processedImage = document.getElementById("processed");
+    const metadataElement = document.getElementById("metadata");
+    const toggleMovebutton = document.getElementById("move");
+    function readAllChunks(readableStream) {
+      const reader = readableStream.getReader();
+      let chunks = [];
+
+      function pump() {
+        return reader.read().then(({ value, done }) => {
+          const decoded = new TextDecoder("utf-8").decode(value);
+          try {
+            const parsed = JSON.parse(chunks.join("") + decoded);
+            const { original_frame, processed_frame, ...metadata } = parsed;
+            originalImage.src = original_frame;
+            processedImage.src = processed_frame;
+            metadataElement.innerHTML = JSON.stringify(metadata, null, 2);
+            chunks = [];
+          } catch (e) {
+            if (chunks.length < 10) {
+              // incomplete input, will try later
+              chunks.push(decoded);
+            } else {
+              chunks = [];
+            }
+          } finally {
+            if (done) {
+              console.log("End of stream, reconnecting...");
+              connect();
+              return;
+            }
+            return pump();
+          }
+        });
+      }
+
+      return pump();
+    }
+
+    function connect() {
+      fetch("/stream")
+        .then(response => readAllChunks(response.body))
+        .catch(err => { 
+          console.log("Unable to connect to server. Reconnecting...") 
+          setTimeout(connect, 1000);
+        });
+    }
+
+    connect();
+
+    toggleMovebutton.addEventListener("click", () => {
+      const move = toggleMovebutton.textContent === "Move";
+      toggleMovebutton.textContent = move ? "Stop" : "Move";
+      fetch("/move", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: move
+      });
+    });
+  </script>
+</html>

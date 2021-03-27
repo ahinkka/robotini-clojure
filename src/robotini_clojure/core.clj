@@ -1,12 +1,12 @@
 (ns robotini-clojure.core
   (:gen-class)
   (:require [clojure.data.json :as json]
-            [clojure.string :as str])
+            [clojure.string :as str]
+            [robotini-clojure.http :as http])
   (:import (java.net Socket)
            (java.io DataInputStream PrintWriter ByteArrayInputStream)
            (javax.imageio ImageIO)
-           (java.awt Dimension)
-           (javax.swing JFrame JLabel ImageIcon)))
+           (java.awt Dimension)))
 
 (def team-name "Thicci Clovalainen")
 (def team-color "#ffff00")
@@ -24,7 +24,7 @@
 (defn write-as-json
   [output-socket data]
   (let [data-as-json (str (json/write-str data) "\n")]
-    (println "* send" data-as-json)
+    ;; (println "* send" data-as-json)
     (doto output-socket
       (.println data-as-json)
       (.flush))))
@@ -45,21 +45,6 @@
              (- image-length bytes-read-so-far))))))
     image-bytes))
 
-(defn make-label
-  [team-id]
-  (let [frame (JFrame. team-id)
-        pane (.getContentPane frame)
-        label (JLabel.)]
-    (doto pane
-      (.setPreferredSize (Dimension. 128 80))
-      (.add label))
-    (doto frame
-      (.setPreferredSize (Dimension. 128 80))
-      (.setVisible true)
-      (.pack)
-      (.setDefaultCloseOperation JFrame/DISPOSE_ON_CLOSE))
-    label))
-
 (defn bytes->image
   [image-bytes]
   (let [byte-input-stream (ByteArrayInputStream. image-bytes)]
@@ -75,10 +60,6 @@
   [image]
   (partition 3
              (-> image .getRaster .getDataBuffer .getData signed-to-unsigned)))
-
-(defn show-image
-  [label buffered-image]
-  (.setIcon label (ImageIcon. buffered-image)))
 
 (defn get-actions
   [pixels]
@@ -98,8 +79,10 @@
         g-rel (if (pos? total) (/ g-count total) 0)
         turn (+ (* r-rel -1) g-rel)]
     ;; (println b-count r-count g-count)
-    [{"action" "forward" "value" 0.05}
-     {"action" "turn" "value" turn}]))
+    [[{"action" "forward" "value" 0.05}
+      {"action" "turn" "value" turn}]
+     {:b-count b-count :g-count g-count :r-count r-count
+      :total total :r-rel r-rel :g-rel g-rel}]))
 
 (defn -main
   []
@@ -111,13 +94,20 @@
                                         (do (println "Defaulting simulator to localhost:11000") "localhost:11000"))
                                        #":")
         [in out] (connect simulator-ip (Integer/parseInt simulator-port))
-        graphics? (not (= "true" (System/getenv "NO_DISPLAY")))
-        label (when graphics? (make-label team-id))]
+        display? (not (= "true" (System/getenv "NO_DISPLAY")))]
+
+    (when display? (.start (Thread. http/-main)))
+
     (write-as-json out {"teamId" team-id "name" team-name "color" team-color})
     (while true
       (let [buffered-image (-> in read-image-bytes bytes->image)
             pixels (-> buffered-image image->bgr-triples)
-            actions (get-actions pixels)]
-        (when label (show-image label buffered-image))
+            [actions debug] (get-actions pixels)]
+        (when display?
+          (reset! http/state
+                  {:original_frame buffered-image
+                   :processed_frame buffered-image
+                   :action actions
+                   :debug debug}))
         (doseq [action actions]
           (write-as-json out action))))))
