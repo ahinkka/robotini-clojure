@@ -50,11 +50,21 @@
       (.setDefaultCloseOperation JFrame/DISPOSE_ON_CLOSE))
     label))
 
-(defn make-image
+(defn bytes->image
   [image-bytes]
-  (let [byte-input-stream (ByteArrayInputStream. image-bytes)
-        buffered-image (ImageIO/read byte-input-stream)]
-    buffered-image))
+  (let [byte-input-stream (ByteArrayInputStream. image-bytes)]
+    (ImageIO/read byte-input-stream)))
+
+(defn signed-to-unsigned
+  [signed-bytes]
+  (map (fn
+         [signed-byte]
+         (bit-and signed-byte 0xff)) signed-bytes))
+
+(defn image->bgr-triples
+  [image]
+  (partition 3
+             (-> image .getRaster .getDataBuffer .getData signed-to-unsigned)))
 
 (defn show-image
   [label buffered-image]
@@ -88,8 +98,8 @@
         label (when graphics? (make-label))]
     (send-json-data out {"teamId" team-id "name" team-name})
     (while true
-      (let [buffered-image (-> in get-image-bytes make-image)
-            pixels (partition 3 (-> buffered-image .getRaster .getDataBuffer .getData))
+      (let [buffered-image (-> in get-image-bytes bytes->image)
+            pixels (-> buffered-image image->bgr-triples)
             actions (get-actions pixels)]
         (when label (show-image label buffered-image))
         (doseq [action actions]
