@@ -1,16 +1,15 @@
 (ns robotini-clojure.core
-  (:require [clojure.data.json :as json])
+  (:gen-class)
+  (:require [clojure.data.json :as json]
+            [clojure.string :as str])
   (:import (java.net Socket)
            (java.io DataInputStream PrintWriter ByteArrayInputStream)
            (javax.imageio ImageIO)
            (java.awt Dimension)
            (javax.swing JFrame JLabel ImageIcon)))
 
-(def simulator-ip "127.0.0.1")
-(def simulator-port 11000)
-(def team-id "thicci")
 (def team-name "Thicci Clovalainen")
-(def graphics? true)
+(def team-color "#ffff00")
 
 (defn connect
   [ip port]
@@ -47,7 +46,7 @@
     image-bytes))
 
 (defn make-label
-  []
+  [team-id]
   (let [frame (JFrame. team-id)
         pane (.getContentPane frame)
         label (JLabel.)]
@@ -102,12 +101,19 @@
     [{"action" "forward" "value" 0.05}
      {"action" "turn" "value" turn}]))
 
-(defn main
+(defn -main
   []
   (println "Starting")
-  (let [[in out] (connect simulator-ip simulator-port)
-        label (when graphics? (make-label))]
-    (write-as-json out {"teamId" team-id "name" team-name})
+  (let [team-id (or (System/getenv "teamid") (do (println "Defaulting to teamid thicci") "thicci"))
+        [simulator-ip simulator-port] (str/split
+                                       (or
+                                        (System/getenv "SIMULATOR")
+                                        (do (println "Defaulting simulator to localhost:11000") "localhost:11000"))
+                                       #":")
+        [in out] (connect simulator-ip (Integer/parseInt simulator-port))
+        graphics? (not (= "true" (System/getenv "NO_DISPLAY")))
+        label (when graphics? (make-label team-id))]
+    (write-as-json out {"teamId" team-id "name" team-name "color" team-color})
     (while true
       (let [buffered-image (-> in read-image-bytes bytes->image)
             pixels (-> buffered-image image->bgr-triples)

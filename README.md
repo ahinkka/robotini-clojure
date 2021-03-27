@@ -4,6 +4,27 @@ A basic Clojure bot template for Robotini Racing. It runs, but not very well.
 
 Run with `lein run` or via REPL of your choice.
 
+## Docker setup
+
+Build the container:
+`docker build -t robotini-clojure:latest .`
+
+Run on Mac
+`docker run -e SIMULATOR=docker.for.mac.localhost:11000 -e teamid=thicci robotini-clojure:latest`
+
+Run on Linux
+`docker run --network="host" -e SIMULATOR=localhost:11000 -e teamid=thicci robotini-clojure:latest`
+
+## GC behavior and memory debugging
+
+First build with
+`lein uberjar`
+
+And then collect some statistics, e.g. by running
+```
+java -jar -XX:+UseG1GC -XX:InitialHeapSize=256m -XX:MaxHeapSize=256m -XX:MaxGCPauseMillis=10 -Xlog:gc=debug:file=gc.log:time,uptime,level,tags:filecount=1,filesize=10m target/robotini-clojure-0.1.0-SNAPSHOT-standalone.jar
+```
+
 ## License
 
 Copyright © 2021
