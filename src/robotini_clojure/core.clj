@@ -96,7 +96,13 @@
         [in out] (connect simulator-ip (Integer/parseInt simulator-port))
         display? (not (= "true" (System/getenv "NO_DISPLAY")))]
 
-    (when display? (.start (Thread. http/-main)))
+    (when display?
+      (do
+        (reset! http/move false)
+        (add-watch http/move :move-changed (fn [_ _ _ should-move]
+                                             (when should-move
+                                               (write-as-json out {"action" "forward" "value" 0.000001}))))
+        (.start (Thread. http/-main))))
 
     (write-as-json out {"teamId" team-id "name" team-name "color" team-color})
     (while true
@@ -110,4 +116,5 @@
                    :action actions
                    :debug debug}))
         (doseq [action actions]
-          (write-as-json out action))))))
+          (when @http/move
+            (write-as-json out action)))))))

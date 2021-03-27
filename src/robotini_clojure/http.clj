@@ -10,6 +10,9 @@
            (java.io ByteArrayOutputStream)
            (javax.imageio ImageIO)))
 
+(def state (atom {}))
+(def move (atom true))
+
 (defn redirect-handler [request]
   {:status 301
    :headers {"Content-Type" "text/plain"
@@ -24,10 +27,9 @@
         encoded (.encodeToString encoder (.toByteArray os))]
     (str "data:image/png;base64," encoded)))
 
-(def state (atom {}))
 (defn stream-handler [request]
   (with-channel request channel
-    (let [watch-key (:remote-addr request)]
+    (let [watch-key (str (:remote-addr request))]
       (on-close channel (fn [status]
                           (remove-watch @state watch-key)
                           (println "channel closed, " status)))
@@ -41,10 +43,22 @@
                                 :processed_frame (buffered-image->base64-png (:processed_frame current-state))})]
              (send! channel (str (json/write-str update) "\r\n") false))))))))
 
+(defn move-handler [request]
+  (let [body (req/body-string request)
+        json-payload (json/read-str body)]
+    (reset! move
+            (cond
+              (= json-payload true) true
+              (= json-payload false) false
+              :else (throw (ex-info "wat" {:body body}))))
+    {:status 200, :body ""}))
+
 (defn handler [request]
-  (if (str/ends-with? (req/path-info request) "stream")
-    (-> request stream-handler)
-    (-> request redirect-handler)))
+  ((cond
+     (str/ends-with? (req/path-info request) "stream") stream-handler
+     (str/ends-with? (req/path-info request) "move") move-handler
+     :else redirect-handler)
+   request))
 
 (def app
   (-> handler
