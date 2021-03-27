@@ -22,11 +22,13 @@
     (println "Connected!")
     [in out]))
 
-(defn send-json-data
+(defn write-as-json
   [output-socket data]
   (let [data-as-json (str (json/write-str data) "\n")]
     (println "* send" data-as-json)
-    (.println output-socket data-as-json)))
+    (doto output-socket
+      (.println data-as-json)
+      (.flush))))
 
 (defn read-image-bytes
   [input-socket]
@@ -105,11 +107,11 @@
   (println "Starting")
   (let [[in out] (connect simulator-ip simulator-port)
         label (when graphics? (make-label))]
-    (send-json-data out {"teamId" team-id "name" team-name})
+    (write-as-json out {"teamId" team-id "name" team-name})
     (while true
       (let [buffered-image (-> in read-image-bytes bytes->image)
             pixels (-> buffered-image image->bgr-triples)
             actions (get-actions pixels)]
         (when label (show-image label buffered-image))
         (doseq [action actions]
-          (send-json-data out action))))))
+          (write-as-json out action))))))
