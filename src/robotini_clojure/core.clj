@@ -98,7 +98,6 @@
 
     (when display?
       (do
-        (reset! http/move false)
         (add-watch http/move :move-changed (fn [_ _ _ should-move]
                                              (when should-move
                                                (write-as-json out {"action" "forward" "value" 0.000001}))))
