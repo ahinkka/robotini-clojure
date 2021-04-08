@@ -4,6 +4,7 @@
             [clojure.string :as str]
             [amalloy.ring-buffer :refer [ring-buffer]]
             [robotini-clojure.util :as util]
+            [robotini-clojure.image :as image]
             [robotini-clojure.http :as http])
   (:import (java.net Socket)
            (java.io DataInputStream PrintWriter ByteArrayInputStream)
@@ -46,11 +47,6 @@
              bytes-read-so-far
              (- image-length bytes-read-so-far))))))
     image-bytes))
-
-(defn bytes->image
-  [image-bytes]
-  (let [byte-input-stream (ByteArrayInputStream. image-bytes)]
-    (ImageIO/read byte-input-stream)))
 
 (defn signed-to-unsigned
   [signed-bytes]
@@ -110,7 +106,7 @@
            frames-processed 0]
       (let [bytes (read-image-bytes! in)
             frame-started-at (System/nanoTime)
-            buffered-image (bytes->image bytes)
+            buffered-image (-> bytes image/bytes->interleaved image/interleaved->buffered-image)
             pixels (-> buffered-image image->bgr-triples)
             [actions debug] (get-actions pixels)]
         (when display?
@@ -130,4 +126,3 @@
           (recur
            (conj ms-taken-buffer millis-taken)
            (inc frames-processed)))))))
-
