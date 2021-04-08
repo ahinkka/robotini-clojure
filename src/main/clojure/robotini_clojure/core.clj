@@ -48,6 +48,11 @@
              (- image-length bytes-read-so-far))))))
     image-bytes))
 
+(defn count-colors-java
+  [image threshold]
+  (let [result (robotini_clojure_java.ColorCounter/count image threshold)]
+    [(.-red result) (.-green result) (.-blue result)]))
+
 (defn signed-to-unsigned
   [signed-bytes]
   (map (fn
@@ -59,19 +64,24 @@
   (partition 3
              (-> image .getRaster .getDataBuffer .getData signed-to-unsigned)))
 
+(defn count-colors-clojure
+  [image threshold]
+  (let [bgr-triples (image->bgr-triples image)]
+    (reduce
+     (fn [[b-acc g-acc r-acc] [b g r]]
+       (cond
+         (< (+ r g b) threshold) [b-acc g-acc r-acc]
+         (and (< r b) (< g b)) [(inc b-acc) g-acc r-acc]
+         (and (< r g) (< b g)) [b-acc (inc g-acc) r-acc]
+         (and (< b r) (< g r)) [b-acc g-acc (inc r-acc)]
+         :else [b-acc g-acc r-acc]))
+     [0 0 0]
+     bgr-triples)))
+
 (defn get-actions
-  [pixels]
+  [image]
   (let [threshold 160 ;; disregard darker pixels
-        [b-count g-count r-count] (reduce
-                                   (fn [[b-acc g-acc r-acc] [b g r]]
-                                     (cond
-                                       (< (+ r g b) threshold) [b-acc g-acc r-acc]
-                                       (and (< r b) (< g b)) [(inc b-acc) g-acc r-acc]
-                                       (and (< r g) (< b g)) [b-acc (inc g-acc) r-acc]
-                                       (and (< b r) (< g r)) [b-acc g-acc (inc r-acc)]
-                                       :else [b-acc g-acc r-acc]))
-                                   [0 0 0]
-                                   pixels)
+        [b-count g-count r-count] (count-colors-java image threshold)
         total (+ b-count g-count r-count)
         r-rel (if (pos? total) (/ r-count total) 0)
         g-rel (if (pos? total) (/ g-count total) 0)
@@ -107,8 +117,7 @@
       (let [bytes (read-image-bytes! in)
             frame-started-at (System/nanoTime)
             buffered-image (-> bytes image/bytes->interleaved image/interleaved->buffered-image)
-            pixels (-> buffered-image image->bgr-triples)
-            [actions debug] (get-actions pixels)]
+            [actions debug] (get-actions buffered-image)]
         (when display?
           (reset! http/state
                   {:original_frame buffered-image
