@@ -14,7 +14,7 @@
 (def team-name "Thicci Clovalainen")
 (def team-color "#ffff00")
 
-(defn connect
+(defn connect!
   [ip port]
   (println "Connecting to simulator" ip port)
   (let [simulator-socket (doto (Socket. ip port)
@@ -24,7 +24,7 @@
     (println "Connected!")
     [in out]))
 
-(defn write-as-json
+(defn write-as-json!
   [output-socket data]
   (let [data-as-json (str (json/write-str data) "\n")]
     ;; (println "* send" data-as-json)
@@ -101,17 +101,17 @@
                                         (System/getenv "SIMULATOR")
                                         (do (println "Defaulting simulator to localhost:11000") "localhost:11000"))
                                        #":")
-        [in out] (connect simulator-ip (Integer/parseInt simulator-port))
+        [in out] (connect! simulator-ip (Integer/parseInt simulator-port))
         display? (not (= "true" (System/getenv "NO_DISPLAY")))]
 
     (when display?
       (do
         (add-watch http/move :move-changed (fn [_ _ _ should-move]
                                              (when should-move
-                                               (write-as-json out {"action" "forward" "value" 0.000001}))))
+                                               (write-as-json! out {"action" "forward" "value" 0.000001}))))
         (.start (Thread. http/-main))))
 
-    (write-as-json out {"teamId" team-id "name" team-name "color" team-color})
+    (write-as-json! out {"teamId" team-id "name" team-name "color" team-color})
     (loop [ms-taken-buffer (ring-buffer 500)
            frames-processed 0]
       (let [bytes (read-image-bytes! in)
@@ -126,7 +126,7 @@
                    :debug debug}))
         (doseq [action actions]
           (when @http/move
-            (write-as-json out action)))
+            (write-as-json! out action)))
 
         (let [millis-taken (/ (- (System/nanoTime) frame-started-at) 1000000.0)]
           (when (and (> frames-processed 0) (= (mod frames-processed 500) 0))
