@@ -12,4 +12,9 @@
                  [http-kit "2.5.3"]]
   :repl-options {:init-ns robotini-clojure.core}
   :main robotini-clojure.core
-  :aot :all)
+  :source-paths ["src/main/clojure"]
+  :java-source-paths ["src/main/java"]
+  :test-paths ["src/test/clojure"]
+  :target-path "target/%s/"
+  :compile-path "%s/classy-files"
+  :profiles {:uberjar {:aot :all :main robotini-clojure.core}})
