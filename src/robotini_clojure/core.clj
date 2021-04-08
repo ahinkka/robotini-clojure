@@ -2,6 +2,8 @@
   (:gen-class)
   (:require [clojure.data.json :as json]
             [clojure.string :as str]
+            [amalloy.ring-buffer :refer [ring-buffer]]
+            [robotini-clojure.util :as util]
             [robotini-clojure.http :as http])
   (:import (java.net Socket)
            (java.io DataInputStream PrintWriter ByteArrayInputStream)
@@ -29,7 +31,7 @@
       (.println data-as-json)
       (.flush))))
 
-(defn read-image-bytes
+(defn read-image-bytes!
   [input-socket]
   (let [image-length (.readUnsignedShort input-socket)
         image-bytes (byte-array image-length)]
@@ -104,8 +106,11 @@
         (.start (Thread. http/-main))))
 
     (write-as-json out {"teamId" team-id "name" team-name "color" team-color})
-    (while true
-      (let [buffered-image (-> in read-image-bytes bytes->image)
+    (loop [ms-taken-buffer (ring-buffer 500)
+           frames-processed 0]
+      (let [bytes (read-image-bytes! in)
+            frame-started-at (System/nanoTime)
+            buffered-image (bytes->image bytes)
             pixels (-> buffered-image image->bgr-triples)
             [actions debug] (get-actions pixels)]
         (when display?
@@ -116,4 +121,13 @@
                    :debug debug}))
         (doseq [action actions]
           (when @http/move
-            (write-as-json out action)))))))
+            (write-as-json out action)))
+
+        (let [millis-taken (/ (- (System/nanoTime) frame-started-at) 1000000.0)]
+          (when (and (> frames-processed 0) (= (mod frames-processed 500) 0))
+            (println "Frame processing time summary" (util/statistical-summary ms-taken-buffer)))
+
+          (recur
+           (conj ms-taken-buffer millis-taken)
+           (inc frames-processed)))))))
+
